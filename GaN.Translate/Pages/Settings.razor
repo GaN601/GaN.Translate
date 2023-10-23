@@ -1,0 +1,28 @@
+﻿@page "/Settings"
+@using GaN.Translate.Dto
+@using GaN.Translate.Enums
+<h3>Settings</h3>
+@foreach (var (key,value) in Keys)
+{
+    <MLabel>@Enum.GetName(key)</MLabel>
+    <MForm Model="value">
+        <MTextField @bind-Value="@value.AppId"
+                    Counter="128"
+                    Label="AppId"></MTextField>
+        <MTextField @bind-Value="@value.Key"
+                    Label="Key"></MTextField>
+    </MForm>
+}
+
+
+@code {
+    private static readonly IDictionary<TranslateEngineEnum, TranslateKey> Keys = new Dictionary<TranslateEngineEnum, TranslateKey>
+    {
+        { TranslateEngineEnum.Baidu ,new TranslateKey()}
+    };
+
+    public static TranslateKey GetEngineKey(TranslateEngineEnum engine)
+    {
+        return Keys[engine];
+    }
+}
