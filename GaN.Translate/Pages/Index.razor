@@ -22,9 +22,9 @@
              @bind-Value="SelectedEngine">
     </MSelect>
 
-    <MSelect Items="Enum.GetValues<LanguageEnum>()" 
-             TItem="LanguageEnum" 
-             TItemValue="LanguageEnum" 
+    <MSelect Items="Enum.GetValues<LanguageEnum>()"
+             TItem="LanguageEnum"
+             TItemValue="LanguageEnum"
              TValue="LanguageEnum"
              ItemText="e => Enum.GetName(e)!"
              ItemValue="e => e"
@@ -34,7 +34,7 @@
 </MContainer>
 
 <MFileInput Label="@I18N.T("翻译文件")"
-            Accept="json"
+            Accept="@IInputParse.SupportFileSuffix"
             TValue="IBrowserFile"
             @bind-Value="InputFile"
             AppendOuterIcon="mdiFileCode"/>

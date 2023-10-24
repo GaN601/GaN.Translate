@@ -2,6 +2,11 @@
 
 public interface IInputParse
 {
+    /// <summary>
+    /// English comma separated
+    /// </summary>
+    public const string SupportFileSuffix = ".json";
+
     Task<IDictionary<string, string>> Parse(Stream stream);
 
     /// <summary>
