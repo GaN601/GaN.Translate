@@ -6,27 +6,39 @@
 @using Microsoft.Extensions.Logging
 @using Newtonsoft.Json
 @using System.Text
-@using KristofferStrube.Blazor.FileSystemAccess
 
 @inject I18n I18N
 @inject ILogger<Index> Logger
 @inject IPopupService Popup
-@inject IFileSystemAccessService FileSystemAccessService
 
 <PageTitle>Index</PageTitle>
 
-<MSelect Items="_engineEnums" TItem="TranslateEngineEnum" TItemValue="TranslateEngineEnum" TValue="TranslateEngineEnum"
-         ItemText="e => Enum.GetName(e)!"
-         ItemValue="e => e"
-         @bind-Value="SelectedEngine">
-</MSelect>
+<MContainer Class="d-flex justify-start">
+    <MSelect Items="_engineEnums" TItem="TranslateEngineEnum" TItemValue="TranslateEngineEnum" TValue="TranslateEngineEnum"
+             ItemText="e => Enum.GetName(e)!"
+             ItemValue="e => e"
+             FullWidth="false"
+             Label="@I18N.T("翻译引擎")"
+             @bind-Value="SelectedEngine">
+    </MSelect>
+
+    <MSelect Items="Enum.GetValues<LanguageEnum>()" 
+             TItem="LanguageEnum" 
+             TItemValue="LanguageEnum" 
+             TValue="LanguageEnum"
+             ItemText="e => Enum.GetName(e)!"
+             ItemValue="e => e"
+             Label="@I18N.T("源语言")"
+             @bind-Value="FromLang">
+    </MSelect>
+</MContainer>
 
 <MFileInput Label="@I18N.T("翻译文件")"
             Accept="json"
             TValue="IBrowserFile"
             @bind-Value="InputFile"
             AppendOuterIcon="mdiFileCode"/>
-<MButton OnClick="@OnTranslate">翻译</MButton>
+<MButton OnClick="@OnTranslate">@I18N.T("翻译")</MButton>
 
 <MTextField @bind-Value="SelectedFolder">
     <AppendContent>
@@ -43,6 +55,7 @@
     private readonly TranslateEngineEnum[] _engineEnums = Enum.GetValues<TranslateEngineEnum>();
         private const string Separator = "\n";
     private string SelectedFolder { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "temp");
+    private LanguageEnum FromLang { get; set; } = LanguageEnum.ZhCn;
 
     private async void OnTranslate(MouseEventArgs obj)
     {
@@ -62,14 +75,13 @@
 
         var inputFileDataMap = await inputParse.Parse(InputFile.OpenReadStream());
 
-        var fromLang = LanguageEnum.ZhCn;
         foreach (var toLang in Enum.GetValues<LanguageEnum>())
         {
-            if (toLang == fromLang || toLang == LanguageEnum.Auto)
+            if (toLang == FromLang || toLang == LanguageEnum.Auto)
             {
                 continue;
             }
-            var translateEndMap = await TranslateEndMap(inputFileDataMap, fromLang, toLang);
+            var translateEndMap = await TranslateEndMap(inputFileDataMap, FromLang, toLang);
 
             if (!Directory.Exists(SelectedFolder))
             {
