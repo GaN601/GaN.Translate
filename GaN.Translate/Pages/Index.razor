@@ -41,7 +41,7 @@
     private IBrowserFile? InputFile { get; set; }
     private TranslateEngineEnum SelectedEngine { get; set; }
     private readonly TranslateEngineEnum[] _engineEnums = Enum.GetValues<TranslateEngineEnum>();
-        private const string Separator = "&";
+        private const string Separator = "\n";
     private string SelectedFolder { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "temp");
 
     private async void OnTranslate(MouseEventArgs obj)
@@ -115,10 +115,10 @@
         var translateEnd = await translate.Translate(sb.ToString(), fromLang, toLang);
         if (translateEnd.IsSuccessful)
         {
-            var strings = translateEnd.Value.Split(Separator);
-            for (var i = 0; i < strings.Length - 1; i++)
+            var translateResults = translateEnd.Value.ToList();
+            for (var i = 0; i < translateResults.Count; i++)
             {
-                translateEndMap[list[i]] = strings[i];
+                translateEndMap[list[i]] = translateResults[i].To;
             }
         }
         else

@@ -8,6 +8,6 @@ namespace GaN.Translate.Interfaces;
 public interface ITranslate
 {
     public TranslateEngineEnum EngineEnum { get; }
-    public Task<Result<string>> Translate(string input,LanguageEnum sourceLang, LanguageEnum targetLang);
+    public Task<Result<IEnumerable<ITranslateResult>>> Translate(string input,LanguageEnum sourceLang, LanguageEnum targetLang);
     
 }

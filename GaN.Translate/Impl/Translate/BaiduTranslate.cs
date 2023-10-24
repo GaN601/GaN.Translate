@@ -15,16 +15,16 @@ namespace GaN.Translate.Impl.Translate;
 public class BaiduTranslate
     : ITranslate
 {
-    private readonly string _commonTranslateApi = "https://fanyi-api.baidu.com/api/trans/vip/translate";
-    private TranslateKey? auth { get; set; }
-    private ILogger<BaiduTranslate> Logger;
+    private const string CommonTranslateApi = "https://fanyi-api.baidu.com/api/trans/vip/translate";
+    private TranslateKey? Auth { get; set; }
+    private readonly ILogger<BaiduTranslate> _logger;
 
     public BaiduTranslate(ILogger<BaiduTranslate> logger)
     {
-        Logger = logger;
+        _logger = logger;
     }
-    
-    private string? GetLangDict(LanguageEnum languageEnum)
+
+    private static string GetLangDict(LanguageEnum languageEnum)
     {
         return languageEnum switch
         {
@@ -41,34 +41,36 @@ public class BaiduTranslate
 
     public TranslateEngineEnum EngineEnum => TranslateEngineEnum.Baidu;
 
-    public async Task<Result<string>> Translate(string input, LanguageEnum sourceLang, LanguageEnum targetLang)
+    public async Task<Result<IEnumerable<ITranslateResult>>> Translate(string input, LanguageEnum sourceLang,
+        LanguageEnum targetLang)
     {
-        auth = Settings.GetEngineKey(TranslateEngineEnum.Baidu);
-        Debug.Assert(auth != null);
-        Debug.Assert(auth.AppId.Length > 0);
-        Debug.Assert(auth.Key.Length > 0);
+        Auth = Settings.GetEngineKey(TranslateEngineEnum.Baidu);
+        Debug.Assert(Auth != null);
+        Debug.Assert(Auth.AppId.Length > 0);
+        Debug.Assert(Auth.Key.Length > 0);
 
-        var param = new BaiduCommonParam(sourceLang, targetLang, input, auth, GetLangDict);
+        var param = new BaiduCommonParam(sourceLang, targetLang, input, Auth, GetLangDict);
         param.ToSign();
 
-        var appendPathSegments = _commonTranslateApi.SetQueryParam("q", param.Q)
+        var appendPathSegments = CommonTranslateApi.SetQueryParam("q", param.Q)
             .SetQueryParam("from", param.From)
             .SetQueryParam("to", param.To)
             .SetQueryParam("appid", param.Auth.AppId)
             .SetQueryParam("salt", param.Salt)
             .SetQueryParam("sign", param.Sign);
 
-        Logger.LogInformation("{} :: {}", nameof(Translate), appendPathSegments.ToString());
+        _logger.LogInformation("{} :: {}", nameof(Translate), appendPathSegments);
         var result = await appendPathSegments.GetJsonAsync<BaiduResult>();
 
         if (result.ErrorMsg?.Length > 0)
         {
-            return new Result<string>(new ApplicationException(result.ErrorMsg));
+            return new Result<IEnumerable<ITranslateResult>>(new ApplicationException(result.ErrorMsg));
         }
 
-        var value = result.TransResult?.First().Dst;
+        _logger.LogInformation("translate result :: {}", result.TransResult);
+        var value = result.TransResult;
         return value != null
-            ? new Result<string>(value)
-            : new Result<string>(new ApplicationException("result is null"));
+            ? new Result<IEnumerable<ITranslateResult>>(value)
+            : new Result<IEnumerable<ITranslateResult>>(new ApplicationException("result is null"));
     }
 }
