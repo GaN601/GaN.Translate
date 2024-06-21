@@ -1,0 +1,169 @@
+@page "/"
+@using System.Text
+@using BlazorComponent.I18n
+@using MAUI.Translate.Rcl.Enums
+@using MAUI.Translate.Rcl.Impl.Parse
+@using MAUI.Translate.Rcl.Interfaces
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Configuration
+@using Microsoft.Extensions.Logging
+@using Newtonsoft.Json
+@inject IEnumerable<ITranslate> TranslatesEnumerable
+@inject IEnumerable<IInputParse> InputParsesEnumerable
+@inject I18n I18N
+@inject ILogger<Index> Logger
+@inject IPopupService Popup
+
+<PageTitle>Index</PageTitle>
+
+<MContainer Class="d-flex justify-start">
+    <MSelect Items="_engineEnums" TItem="TranslateEngineEnum" TItemValue="TranslateEngineEnum" TValue="TranslateEngineEnum"
+             ItemText="e => Enum.GetName(e)!"
+             ItemValue="e => e"
+             FullWidth="false"
+             Label="@I18N.T("翻译引擎")"
+             @bind-Value="SelectedEngine">
+    </MSelect>
+
+    <MSelect Items="Enum.GetValues<LanguageEnum>()"
+             TItem="LanguageEnum"
+             TItemValue="LanguageEnum"
+             TValue="LanguageEnum"
+             ItemText="e => Enum.GetName(e)!"
+             ItemValue="e => e"
+             Label="@I18N.T("源语言")"
+             @bind-Value="FromLang">
+    </MSelect>
+</MContainer>
+
+<MFileInput Label="@I18N.T("翻译文件")"
+            Accept="@IInputParse.SupportFileSuffix"
+            TValue="IBrowserFile"
+            @bind-Value="InputFile"
+            AppendOuterIcon="mdiFileCode"/>
+<MButton OnClick="@OnTranslate">@I18N.T("翻译")</MButton>
+
+<MTextField @bind-Value="SelectedFolder">
+    <AppendContent>
+        <MButton OnClick="ShowFolder">
+            <MIcon>mdi-folder-arrow-down-outline</MIcon>
+        </MButton>
+    </AppendContent>
+</MTextField>
+
+@code
+{
+    private IBrowserFile? InputFile { get; set; }
+    private TranslateEngineEnum SelectedEngine { get; set; }
+    private readonly TranslateEngineEnum[] _engineEnums = Enum.GetValues<TranslateEngineEnum>();
+    private const string Separator = "\n";
+    private string SelectedFolder { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "temp");
+    private LanguageEnum FromLang { get; set; } = LanguageEnum.ZhCn;
+    private IList<IInputParse> _inputParses = [];
+    private IList<ITranslate> _translates = [];
+
+    protected override void OnInitialized()
+    {
+        _inputParses = InputParsesEnumerable.ToList();
+        _translates = TranslatesEnumerable.ToList();
+        base.OnInitialized();
+    }
+
+
+    private async void OnTranslate(MouseEventArgs obj)
+    {
+        if (InputFile is null)
+        {
+            await Popup.EnqueueSnackbarAsync("InputFile is null");
+            return;
+        }
+
+        var inputParse = _inputParses.FirstOrDefault(x =>
+            x.SupportFile().Equals(InputFile.ContentType));
+        if (inputParse is null)
+        {
+            await Popup.EnqueueSnackbarAsync("InputFileParseService is null");
+            return;
+        }
+
+        var cb = new ConfigurationBuilder();
+        var reader = new StreamReader(InputFile.OpenReadStream());
+        var json = await reader.ReadToEndAsync();
+
+        var configurationRoot = cb.AddJsonStream((new MemoryStream(Encoding.UTF8.GetBytes(json)))).Build();
+        var inputFileDataMap = configurationRoot;
+
+        var finalFrom = FromLang;
+        foreach (var toLang in new List<LanguageEnum> { LanguageEnum.ZhCn })
+        {
+            if (toLang == finalFrom || toLang == LanguageEnum.Auto)
+            {
+                continue;
+            }
+
+            var translateEndMap = await TranslateEndMap(inputFileDataMap, finalFrom, toLang);
+
+            if (!Directory.Exists(SelectedFolder))
+            {
+                Directory.CreateDirectory(SelectedFolder);
+            }
+
+            var path = Path.Combine(SelectedFolder, $"test-{Enum.GetName(toLang)}.json");
+
+            await File.WriteAllTextAsync(path, JsonConvert.SerializeObject(JsonParse.ToJson(new ConfigurationBuilder().AddInMemoryCollection(translateEndMap!).Build().GetChildren())));
+        }
+    }
+
+    private async Task<Dictionary<string, string?>> TranslateEndMap(IConfiguration inputFileDataMap, LanguageEnum fromLang, LanguageEnum toLang)
+    {
+        var translate = _translates.First(x => x.EngineEnum == SelectedEngine);
+
+        var dictionary = new Dictionary<string, string?>(128);
+        var parameters = inputFileDataMap.AsEnumerable();
+        await foreach (var (key, value) in TranslateTextAsyncEnumerable(translate, parameters, fromLang, toLang))
+        {
+            dictionary[key] = value;
+        }
+
+        return dictionary;
+    }
+
+    private async IAsyncEnumerable<(string, string)> TranslateTextAsyncEnumerable(ITranslate translate, IEnumerable<KeyValuePair<string, string?>> inputFileDataMap, LanguageEnum fromLang, LanguageEnum toLang)
+    {
+        foreach (var (key, value) in inputFileDataMap)
+        {
+            if (value == null)
+            {
+                continue;
+            }
+
+            var translateResult = await TranslateText(translate, value, fromLang, toLang);
+            yield return (key, translateResult);
+        }
+    }
+
+
+    private async Task<string> TranslateText(ITranslate translate, string v, LanguageEnum fromLang, LanguageEnum toLang)
+    {
+        var translateEnd = await translate.Translate(v, fromLang, toLang);
+
+        var translateResults = translateEnd.ToList();
+        if (translateResults.Count == 0)
+        {
+            await Popup.EnqueueSnackbarAsync("translate engine result is empty");
+            return "";
+        }
+
+        var sb = new StringBuilder();
+        translateResults.Select(x => x.To).ForEach(x => sb.Append(x).Append(' '));
+
+        return sb.ToString();
+    }
+
+    private async void ShowFolder(MouseEventArgs obj)
+    {
+        await Popup.EnqueueSnackbarAsync("No Impl");
+
+        //  var directoryHandle = await FileSystemAccessService.ShowDirectoryPickerAsync();
+    }
+}
