@@ -94,7 +94,7 @@
         var inputFileDataMap = configurationRoot;
 
         var finalFrom = FromLang;
-        foreach (var toLang in new List<LanguageEnum> { LanguageEnum.ZhCn })
+        foreach (var toLang in Enum.GetValues<LanguageEnum>())
         {
             if (toLang == finalFrom || toLang == LanguageEnum.Auto)
             {
