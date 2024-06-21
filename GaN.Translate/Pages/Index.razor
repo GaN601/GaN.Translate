@@ -5,6 +5,9 @@
 @using Microsoft.Extensions.DependencyInjection
 @using Microsoft.Extensions.Logging
 @using Newtonsoft.Json
+@using Microsoft.Extensions.Configuration
+@using Flurl.Util
+@using GaN.Translate.Impl.Parse
 @using System.Text
 
 @inject I18n I18N
@@ -73,7 +76,12 @@
             return;
         }
 
-        var inputFileDataMap = await inputParse.Parse(InputFile.OpenReadStream());
+        var cb = new ConfigurationBuilder();
+        var reader = new StreamReader(InputFile.OpenReadStream());
+        var json = await reader.ReadToEndAsync();
+        
+        var configurationRoot = cb.AddJsonStream(new MemoryStream(Encoding.UTF8.GetBytes(json))).Build();
+        var inputFileDataMap = configurationRoot;
 
         foreach (var toLang in Enum.GetValues<LanguageEnum>())
         {
@@ -89,11 +97,11 @@
             }
             var path = Path.Combine(SelectedFolder, $"test-{Enum.GetName(toLang)}.json");
 
-            await File.WriteAllTextAsync(path, JsonConvert.SerializeObject(translateEndMap));
+            await File.WriteAllTextAsync(path, JsonConvert.SerializeObject(JsonParse.ToJson(translateEndMap.GetChildren())));
         }
     }
 
-    private async Task<Dictionary<string, string>> TranslateEndMap(IDictionary<string, string> inputFileDataMap, LanguageEnum fromLang, LanguageEnum toLang)
+    private async Task<IConfiguration> TranslateEndMap(IConfiguration inputFileDataMap, LanguageEnum fromLang, LanguageEnum toLang)
     {
         var translate = App.Provider.GetServices<ITranslate>().First(x => x.EngineEnum == SelectedEngine);
 
@@ -101,11 +109,21 @@
         var list = new List<string>(128);
 
         var sb = new StringBuilder();
-        var translateEndMap = new Dictionary<string, string>(128);
+        var translateEndMap =   new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string>()!).Build();
 
-        foreach (var (key, value) in inputFileDataMap)
+
+        var parameters = inputFileDataMap.AsEnumerable();
+        foreach ( var entry in parameters)
         {
-            if (count + value.Length > 2000)
+            
+            var s = entry.Value;
+            if (s == null)
+            {
+                continue;
+            }
+            
+            if (count + s.Length > 2000)
             {
                 count = 0;
                 await TranslateText(translate, sb, translateEndMap, list, toLang, fromLang);
@@ -113,23 +131,29 @@
                 list.Clear();
             }
 
-            count += value.Length;
-            list.Add(key);
-            sb.Append(value).Append(Separator);
+            count += s.Length;
+            list.Add(entry.Key);
+            sb.Append(entry.Value).Append(Separator);
         }
 
         await TranslateText(translate, sb, translateEndMap, list, fromLang, toLang);
         return translateEndMap;
     }
 
-    private async Task TranslateText(ITranslate translate, StringBuilder sb, IDictionary<string, string> translateEndMap, IReadOnlyList<string> list, LanguageEnum fromLang, LanguageEnum toLang)
+    private async Task TranslateText(ITranslate translate, StringBuilder sb, IConfiguration translateEndMap, IReadOnlyList<string> list, LanguageEnum fromLang, LanguageEnum toLang)
     {
         var translateEnd = await translate.Translate(sb.ToString(), fromLang, toLang);
         if (translateEnd.IsSuccessful)
         {
             var translateResults = translateEnd.Value.ToList();
+            
             for (var i = 0; i < translateResults.Count; i++)
             {
+                if (i >= translateResults.Count || i>= list.Count)
+                {
+                    continue;
+                }
+
                 translateEndMap[list[i]] = translateResults[i].To;
             }
         }

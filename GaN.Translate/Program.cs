@@ -4,9 +4,11 @@ using GaN.Translate.Impl.Parse;
 using GaN.Translate.Impl.Translate;
 using GaN.Translate.Interfaces;
 using KristofferStrube.Blazor.FileSystemAccess;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
+using Newtonsoft.Json.Linq;
 using Photino.Blazor;
 
 internal class Program
@@ -44,3 +46,4 @@ internal class Program
         app.Run();
     }
 }
+
